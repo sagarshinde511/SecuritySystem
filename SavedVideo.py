@@ -8,60 +8,82 @@ FTP_HOST = "82.180.143.66"
 FTP_USER = "u263681140"
 FTP_PASS = "SagarA@2025"
 REMOTE_PATH = "SecuritySystem" 
-
-# Base URL for playing and downloading videos via HTTP
 BASE_WEB_URL = "https://aeprojecthub.in/SecuritySystem/" 
+
+# DEFAULT LOGIN CREDENTIALS
+DEFAULT_USER = "admin"
+DEFAULT_PASS = "password123"
 # -----------------------------------------------
 
 st.set_page_config(page_title="Security Dashboard", layout="wide", page_icon="🛡️")
 
+# --- LOGIN LOGIC ---
+if 'logged_in' not in st.session_state:
+    st.session_state['logged_in'] = False
+
+def login():
+    st.sidebar.title("🔐 Access Control")
+    user = st.sidebar.text_input("Username")
+    pw = st.sidebar.text_input("Password", type="password")
+    if st.sidebar.button("Login"):
+        if user == DEFAULT_USER and pw == DEFAULT_PASS:
+            st.session_state['logged_in'] = True
+            st.rerun()
+        else:
+            st.sidebar.error("Invalid credentials")
+
+# If not logged in, show login screen and stop execution
+if not st.session_state['logged_in']:
+    st.title("🛡️ Security Cloud Gallery")
+    st.info("Please login via the sidebar to access recordings.")
+    login()
+    st.stop() 
+
+# --- MAIN DASHBOARD (Only visible if logged_in is True) ---
+
 @st.cache_data(ttl=60)
 def get_video_list():
-    """Connects to FTP and retrieves a list of video files."""
     try:
         ftp = FTP(FTP_HOST)
         ftp.login(FTP_USER, FTP_PASS)
         ftp.cwd(REMOTE_PATH)
         files = ftp.nlst()
         ftp.quit()
-        
-        # Filter for common video formats
         valid = [f for f in files if f.lower().endswith(('.mp4', '.avi', '.mov', '.mkv'))]
-        valid.sort(reverse=True)  # Newest files usually have higher timestamps/names
+        valid.sort(reverse=True)
         return valid
     except Exception as e:
         st.error(f"FTP Connection Error: {e}")
         return []
 
+# Sidebar Logout
+if st.sidebar.button("Logout"):
+    st.session_state['logged_in'] = False
+    st.rerun()
+
 st.title("🛡️ Security Cloud Gallery")
+st.markdown(f"**Welcome, {DEFAULT_USER}!**")
 st.markdown("---")
 
-# Initialize the video list to prevent NameError
 videos = get_video_list()
 
 if videos:
-    # Sidebar or Top selection
     selected_video = st.selectbox("Select a recording to view:", videos)
-    
-    # Construct the full URL
     video_url = f"{BASE_WEB_URL}{quote(selected_video)}"
     
     col1, col2 = st.columns([3, 1])
     
     with col1:
         st.subheader("📺 Video Player")
-        # Streamlit's built-in player
         st.video(video_url)
         
     with col2:
         st.subheader("🛠️ Actions & Info")
         st.info(f"**File:** {selected_video}")
         
-        # --- DOWNLOAD LOGIC ---
         try:
-            # We fetch the video data so the user can download it locally
-            with st.spinner('Preparing download...'):
-                response = requests.get(video_url, timeout=10)
+            with st.spinner('Fetching file for download...'):
+                response = requests.get(video_url, timeout=15)
                 if response.status_code == 200:
                     st.download_button(
                         label="📥 Download to Local",
@@ -71,26 +93,15 @@ if videos:
                         use_container_width=True
                     )
                 else:
-                    st.error("Could not fetch file for download.")
+                    st.error("Download link broken (404/CORS)")
         except Exception as e:
-            st.error(f"Download Error: {e}")
+            st.error("Could not prepare download.")
         
         st.markdown("---")
         st.markdown(f"[🔗 Open Direct Link]({video_url})")
-        
-        with st.expander("Help & Diagnostics"):
-            st.write("""
-            - **Black screen?** Check if your browser supports the codec (H.264 is best).
-            - **File not found?** Ensure the filename on FTP matches the URL path.
-            - **Slow loading?** Large files are being streamed from your host server.
-            """)
 
 else:
-    st.warning("🔍 No videos found. Please check your FTP credentials or the REMOTE_PATH folder.")
-    if st.button("🔄 Retry Connection"):
+    st.warning("🔍 No videos found or FTP server unreachable.")
+    if st.button("🔄 Refresh List"):
         st.cache_data.clear()
         st.rerun()
-
-# Footer
-st.markdown("---")
-st.caption("Security System Dashboard © 2026")
