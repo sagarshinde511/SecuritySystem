@@ -1,6 +1,5 @@
 import streamlit as st
 from ftplib import FTP
-import pandas as pd
 from urllib.parse import quote
 
 # ---------------- CONFIGURATION ----------------
@@ -13,46 +12,46 @@ BASE_WEB_URL = "http://aeprojecthub.in/SecuritySystem/"
 
 st.set_page_config(page_title="SecuritySystem Video Gallery", layout="wide", page_icon="🛡️")
 
-# Custom CSS to improve the video player UI
+# Custom CSS for styling
 st.markdown("""
     <style>
-    .stVideo { margin-bottom: 20px; border-radius: 10px; }
-    .video-card { border: 1px solid #ddd; padding: 10px; border-radius: 5px; }
+    .video-container {
+        border: 1px solid #444;
+        border-radius: 10px;
+        padding: 10px;
+        background-color: #1e1e1e;
+        margin-bottom: 20px;
+    }
     </style>
     """, unsafe_allow_html=True)
 
 st.title("🛡️ SecuritySystem: Cloud Video Gallery")
 
-@st.cache_data(ttl=300)  # Cache results for 5 minutes
+@st.cache_data(ttl=300)
 def get_video_list():
     try:
         ftp = FTP(FTP_HOST)
         ftp.login(FTP_USER, FTP_PASS)
-        
         try:
             ftp.cwd(REMOTE_PATH)
+            files = ftp.nlst()
         except:
-            st.error(f"Directory '{REMOTE_PATH}' not found on server.")
-            ftp.quit()
+            st.error(f"Directory '{REMOTE_PATH}' not found.")
             return []
-
-        # Get all filenames
-        files = ftp.nlst()
-        ftp.quit()
+        finally:
+            ftp.quit()
         
-        # Filter for common video formats
-        valid_extensions = ('.mp4', '.avi', '.mov', '.webm')
-        video_files = [f for f in files if f.lower().endswith(valid_extensions)]
-        
-        # Sort by name (usually timestamped) newest first
+        # Filter and sort
+        valid_exts = ('.mp4', '.avi', '.mov', '.webm')
+        video_files = [f for f in files if f.lower().endswith(valid_exts)]
         video_files.sort(reverse=True)
         return video_files
     except Exception as e:
-        st.error(f"FTP Connection Error: {e}")
+        st.error(f"FTP Error: {e}")
         return []
 
-# Sidebar Controls
-st.sidebar.header("Controls")
+# Sidebar
+st.sidebar.header("Navigation")
 if st.sidebar.button("🔄 Refresh Gallery"):
     st.cache_data.clear()
     st.rerun()
@@ -60,39 +59,48 @@ if st.sidebar.button("🔄 Refresh Gallery"):
 videos = get_video_list()
 
 if not videos:
-    st.info("No security videos found in the remote folder.")
+    st.info("No recordings found in the cloud storage.")
 else:
-    st.sidebar.success(f"Found {len(videos)} recordings")
+    st.sidebar.write(f"Total Recordings: {len(videos)}")
     
-    # 1. Main Player Section
-    selected_video = st.selectbox("Select a recording to play:", videos)
+    # Selection
+    selected_video = st.selectbox("Pick a recording to view:", videos)
     
-    # URL Encode the filename (Crucial for filenames with spaces/dots)
-    encoded_filename = quote(selected_video)
-    video_url = f"{BASE_WEB_URL}{encoded_filename}"
+    # URL Prep
+    encoded_name = quote(selected_video)
+    video_url = f"{BASE_WEB_URL}{encoded_name}"
     
     st.divider()
-    
-    col1, col2 = st.columns([2, 1])
-    
+
+    # Main Viewing Area
+    col1, col2 = st.columns([3, 1])
+
     with col1:
-        st.subheader(f"🎥 Playing: {selected_video}")
-        
-        # Logic for AVI vs MP4
+        st.subheader(f"🎥 Now Playing: {selected_video}")
         if selected_video.lower().endswith('.avi'):
-            st.warning("⚠️ .AVI detected. This format usually requires downloading to view.")
-            st.video(video_url) # Attempt play anyway
-        else:
-            st.video(video_url)
+            st.warning("⚠️ .AVI detected. If the player is blank, please use the download link in the right panel.")
+        
+        # Streamlit Player
+        st.video(video_url)
 
     with col2:
-        st.subheader("Details & Download")
-        st.info(f"**Filename:** {selected_video}")
-        st.markdown(f"**Direct Link:** [Open in Browser]({video_url})")
+        st.subheader("Video Info")
+        st.write(f"**Name:** \n`{selected_video}`")
         
-        # Manual Download Button
-        st.download_button(
-            label="💾 Download Video File",
-            data="",
-            file_name=selected_video,
-            help="Right
+        st.markdown(f"### [🔗 Open Direct Link]({video_url})")
+        
+        # Fixed the string literal error here
+        st.info("💡 Pro Tip: If the video won't play, right-click the link above and choose 'Save Link As' to download.")
+
+    st.divider()
+    
+    # Recent Grid (Top 6)
+    st.subheader("Recent Footage (Quick Preview)")
+    grid_cols = st.columns(3)
+    for index, vid_name in enumerate(videos[:6]):
+        with grid_cols[index % 3]:
+            st.markdown('<div class="video-container">', unsafe_allow_html=True)
+            st.caption(f"📄 {vid_name}")
+            # Smaller player for grid
+            st.video(f"{BASE_WEB_URL}{quote(vid_name)}")
+            st.markdown('</div>', unsafe_allow_html=True)
