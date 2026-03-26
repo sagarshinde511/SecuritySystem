@@ -7,7 +7,7 @@ FTP_HOST = "82.180.143.66"
 FTP_USER = "u263681140"
 FTP_PASS = "SagarA@2025"
 REMOTE_PATH = "SecuritySystem" 
-BASE_WEB_URL = "http://aeprojecthub.in/SecuritySystem/"
+BASE_WEB_URL = "https://aeprojecthub.in/SecuritySystem/"
 # -----------------------------------------------
 
 st.set_page_config(page_title="SecuritySystem Video Gallery", layout="wide", page_icon="🛡️")
