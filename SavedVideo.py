@@ -6,7 +6,7 @@ import pandas as pd
 FTP_HOST = "82.180.143.66"
 FTP_USER = "u263681140"
 FTP_PASS = "SagarA@2025"
-REMOTE_PATH = "FireFighter"  # Updated folder name
+REMOTE_PATH = "SecuritySystem"  # Updated folder name
 BASE_WEB_URL = "http://aeprojecthub.in/SecuritySystem/" # Updated URL
 # -----------------------------------------------
 
