@@ -1,78 +1,98 @@
 import streamlit as st
 from ftplib import FTP
 import pandas as pd
+from urllib.parse import quote
 
 # ---------------- CONFIGURATION ----------------
 FTP_HOST = "82.180.143.66"
 FTP_USER = "u263681140"
 FTP_PASS = "SagarA@2025"
-REMOTE_PATH = "SecuritySystem"  # Updated folder name
-BASE_WEB_URL = "http://aeprojecthub.in/SecuritySystem/" # Updated URL
+REMOTE_PATH = "SecuritySystem" 
+BASE_WEB_URL = "http://aeprojecthub.in/SecuritySystem/"
 # -----------------------------------------------
 
-st.set_page_config(page_title="SecuritySystem Video Gallery", layout="wide")
+st.set_page_config(page_title="SecuritySystem Video Gallery", layout="wide", page_icon="🛡️")
+
+# Custom CSS to improve the video player UI
+st.markdown("""
+    <style>
+    .stVideo { margin-bottom: 20px; border-radius: 10px; }
+    .video-card { border: 1px solid #ddd; padding: 10px; border-radius: 5px; }
+    </style>
+    """, unsafe_allow_html=True)
 
 st.title("🛡️ SecuritySystem: Cloud Video Gallery")
-st.markdown(f"Accessing recordings from: `{BASE_WEB_URL}`")
 
+@st.cache_data(ttl=300)  # Cache results for 5 minutes
 def get_video_list():
     try:
         ftp = FTP(FTP_HOST)
         ftp.login(FTP_USER, FTP_PASS)
-        # Ensure we navigate to the correct directory
+        
         try:
             ftp.cwd(REMOTE_PATH)
         except:
             st.error(f"Directory '{REMOTE_PATH}' not found on server.")
+            ftp.quit()
             return []
 
-        # Get all filenames in the folder
+        # Get all filenames
         files = ftp.nlst()
         ftp.quit()
         
-        # Updated Filter: Check for both .mp4 and .avi (case-insensitive)
-        valid_extensions = ('.mp4', '.avi')
+        # Filter for common video formats
+        valid_extensions = ('.mp4', '.avi', '.mov', '.webm')
         video_files = [f for f in files if f.lower().endswith(valid_extensions)]
         
-        # Sort by newest first (assuming naming convention includes date/time)
+        # Sort by name (usually timestamped) newest first
         video_files.sort(reverse=True)
         return video_files
     except Exception as e:
-        st.error(f"Error connecting to FTP: {e}")
+        st.error(f"FTP Connection Error: {e}")
         return []
 
-# Sidebar for controls
+# Sidebar Controls
+st.sidebar.header("Controls")
 if st.sidebar.button("🔄 Refresh Gallery"):
     st.cache_data.clear()
+    st.rerun()
 
 videos = get_video_list()
 
 if not videos:
-    st.info("No security videos found in the folder.")
+    st.info("No security videos found in the remote folder.")
 else:
-    st.sidebar.write(f"Total Files Found: {len(videos)}")
+    st.sidebar.success(f"Found {len(videos)} recordings")
     
-    # Selection box to pick a video
+    # 1. Main Player Section
     selected_video = st.selectbox("Select a recording to play:", videos)
     
-    # Layout: Top video player
-    st.subheader(f"Viewing: {selected_video}")
-    video_url = BASE_WEB_URL + selected_video
-    
-    # Handling .avi browser limitations
-    if selected_video.lower().endswith('.avi'):
-        st.warning("⚠️ .AVI files may not play directly in all browsers. If it doesn't load, use the link below.")
-        st.markdown(f"[Download or Open Video Link]({video_url})")
-    
-    st.video(video_url)
+    # URL Encode the filename (Crucial for filenames with spaces/dots)
+    encoded_filename = quote(selected_video)
+    video_url = f"{BASE_WEB_URL}{encoded_filename}"
     
     st.divider()
     
-    # Bottom Layout: Grid gallery
-    st.subheader("Recent Recordings")
-    cols = st.columns(3)
-    for i, vid in enumerate(videos[:9]): # Show top 9 in grid
-        with cols[i % 3]:
-            st.caption(f"📄 {vid}")
-            # Use st.video for previewing (works best for MP4)
-            st.video(BASE_WEB_URL + vid)
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.subheader(f"🎥 Playing: {selected_video}")
+        
+        # Logic for AVI vs MP4
+        if selected_video.lower().endswith('.avi'):
+            st.warning("⚠️ .AVI detected. This format usually requires downloading to view.")
+            st.video(video_url) # Attempt play anyway
+        else:
+            st.video(video_url)
+
+    with col2:
+        st.subheader("Details & Download")
+        st.info(f"**Filename:** {selected_video}")
+        st.markdown(f"**Direct Link:** [Open in Browser]({video_url})")
+        
+        # Manual Download Button
+        st.download_button(
+            label="💾 Download Video File",
+            data="",
+            file_name=selected_video,
+            help="Right
